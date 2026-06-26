@@ -497,6 +497,7 @@ pub fn main(init: std.process.Init) !void {
         // chão (tile animado)
         rl.drawTexture(tex_base, @intFromFloat(base_offset), @intFromFloat(FLOOR_Y), rl.Color.white);
         rl.drawTexture(tex_base, @intFromFloat(base_offset + @as(f32, @floatFromInt(tex_base.width))), @intFromFloat(FLOOR_Y), rl.Color.white);
+        rl.drawTexture(tex_base, @intFromFloat(base_offset + 2 * @as(f32, @floatFromInt(tex_base.width))), @intFromFloat(FLOOR_Y), rl.Color.white);
 
         // pássaro
         const btex = bird_texs[bird.frame];
