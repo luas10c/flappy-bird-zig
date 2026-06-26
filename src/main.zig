@@ -99,6 +99,26 @@ fn loadAudioAsset(cwd: []const u8, file: []const u8) !rl.Sound {
     return rl.loadSound(path);
 }
 
+fn loadMusicAsset(cwd: []const u8, file: []const u8) !rl.Music {
+    const zig_out = std.fs.path.dirname(cwd).?;
+    const project = std.fs.path.dirname(zig_out).?;
+
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try std.fmt.bufPrintZ(
+        &buf,
+        "{s}/src/assets/audio/{s}",
+        .{ project, file },
+    );
+
+    return rl.loadMusicStream(path);
+}
+
+fn setVolume(volume: f32, sounds: []const rl.Sound) void {
+    for (sounds) |s| {
+        rl.setSoundVolume(s, volume);
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
 
@@ -141,11 +161,15 @@ pub fn main(init: std.process.Init) !void {
     }
     defer for (digit_texs) |t| rl.unloadTexture(t);
 
+    const music_menu = try loadMusicAsset(cwd, "menu.ogg");
+
     const snd_die = try loadAudioAsset(cwd, "die.ogg");
     const snd_hit = try loadAudioAsset(cwd, "hit.ogg");
     const snd_point = try loadAudioAsset(cwd, "point.ogg");
     const snd_swoosh = try loadAudioAsset(cwd, "swoosh.ogg");
     const snd_wing = try loadAudioAsset(cwd, "wing.ogg");
+
+    defer rl.unloadMusicStream(music_menu);
 
     defer rl.unloadSound(snd_die);
     defer rl.unloadSound(snd_hit);
@@ -168,14 +192,25 @@ pub fn main(init: std.process.Init) !void {
 
     var menu_item = MenuItem.start;
 
-    //rl.setRandomSeed(@intCast(std.time.milliTimestamp() & 0xFFFFFFFF));
+    setVolume(volume, &.{
+        snd_die,
+        snd_hit,
+        snd_point,
+        snd_swoosh,
+        snd_wing,
+    });
+
+    rl.setMusicVolume(music_menu, volume);
+    rl.playMusicStream(music_menu);
 
     const BASE_H: i32 = tex_base.height;
     const FLOOR_Y: f32 = H - @as(f32, @floatFromInt(BASE_H));
 
-    const cfg = physics(difficulty);
-
     while (!rl.windowShouldClose()) {
+        rl.updateMusicStream(music_menu);
+
+        const cfg = physics(difficulty);
+
         const flap = rl.isKeyPressed(.space) or rl.isMouseButtonPressed(.left);
 
         const up = rl.isKeyPressed(.up);
@@ -225,11 +260,14 @@ pub fn main(init: std.process.Init) !void {
                         .volume => {
                             volume = @max(0.0, volume - 0.25);
 
-                            rl.setSoundVolume(snd_die, volume);
-                            rl.setSoundVolume(snd_hit, volume);
-                            rl.setSoundVolume(snd_point, volume);
-                            rl.setSoundVolume(snd_swoosh, volume);
-                            rl.setSoundVolume(snd_wing, volume);
+                            setVolume(volume, &.{
+                                snd_die,
+                                snd_hit,
+                                snd_point,
+                                snd_swoosh,
+                                snd_wing,
+                            });
+                            rl.setMusicVolume(music_menu, volume);
                         },
 
                         else => {},
@@ -251,11 +289,15 @@ pub fn main(init: std.process.Init) !void {
                         .volume => {
                             volume = @min(1.0, volume + 0.25);
 
-                            rl.setSoundVolume(snd_die, volume);
-                            rl.setSoundVolume(snd_hit, volume);
-                            rl.setSoundVolume(snd_point, volume);
-                            rl.setSoundVolume(snd_swoosh, volume);
-                            rl.setSoundVolume(snd_wing, volume);
+                            setVolume(volume, &.{
+                                snd_die,
+                                snd_hit,
+                                snd_point,
+                                snd_swoosh,
+                                snd_wing,
+                            });
+
+                            rl.setMusicVolume(music_menu, volume);
                         },
 
                         else => {},
@@ -265,6 +307,9 @@ pub fn main(init: std.process.Init) !void {
                 if (enter) {
                     switch (menu_item) {
                         .start => {
+                            const seed: u32 = @truncate(@as(u64, @intCast(std.time.nanoTimestamp())));
+                            rl.setRandomSeed(seed);
+
                             bird = Bird{};
                             pipes.clearRetainingCapacity();
                             score = 0;
