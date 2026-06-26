@@ -307,7 +307,18 @@ pub fn main(init: std.process.Init) !void {
                 if (enter) {
                     switch (menu_item) {
                         .start => {
-                            const seed: u32 = @truncate(@as(u64, @intCast(std.time.nanoTimestamp())));
+                            var seed: u32 = undefined;
+
+                            const bytes = std.os.linux.getrandom(
+                                std.mem.asBytes(&seed).ptr,
+                                @sizeOf(u32),
+                                0,
+                            );
+
+                            if (bytes != @sizeOf(u32)) {
+                                return error.GetRandomFailed;
+                            }
+
                             rl.setRandomSeed(seed);
 
                             bird = Bird{};
